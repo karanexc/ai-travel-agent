@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+langchain
+langchain-openai
+python-dotenv
+requests
+beautifulsoup4
+serpapi
+streamlit
+pydantic
+google-search-results
