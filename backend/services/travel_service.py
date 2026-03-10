@@ -15,7 +15,7 @@ def collect_web_data(query):
 
     combined_text = ""
 
-    for r in results:
+    for r in results[:3]:
 
         url = r["link"]
 
@@ -29,7 +29,7 @@ def collect_web_data(query):
     return combined_text
 
 
-def plan_trip(origin, destination, travelers, days):
+def generate_trip(origin, destination, travelers, days):
 
     print("\nSearching flight information...\n")
 

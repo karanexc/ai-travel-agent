@@ -17,7 +17,7 @@ def scrape_webpage(url: str):
             )
         }
 
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=4)
 
         if response.status_code != 200:
             return None

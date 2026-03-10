@@ -184,6 +184,7 @@ with tab1:
 
 
 # --------------------------------------------------
+# --------------------------------------------------
 # CHAT TAB
 # --------------------------------------------------
 
@@ -196,4 +197,56 @@ with tab2:
     )
 
     if st.button("Ask Assistant"):
-        st.info("Chat assistant integration coming next.")
+
+        if not user_input.strip():
+            st.warning("Please enter a travel request.")
+        else:
+
+            with st.spinner("🤖 AI is planning your trip..."):
+
+                payload = {"query": user_input}
+
+                response = requests.post(
+                    "http://127.0.0.1:8000/chat-plan",
+                    json=payload
+                )
+
+                result = response.json()
+
+            st.success("Trip generated successfully!")
+
+            st.divider()
+
+            # ------------------------------
+            # FLIGHTS
+            # ------------------------------
+
+            st.subheader("✈️ Flights")
+            st.write(result["flight_info"])
+
+            st.divider()
+
+            # ------------------------------
+            # HOTELS
+            # ------------------------------
+
+            st.subheader("🏨 Hotels")
+            st.markdown(result["hotel_info"])
+
+            st.divider()
+
+            # ------------------------------
+            # BUDGET
+            # ------------------------------
+
+            st.subheader("💰 Budget")
+            st.json(result["budget"])
+
+            st.divider()
+
+            # ------------------------------
+            # ITINERARY
+            # ------------------------------
+
+            st.subheader("🗺️ Travel Itinerary")
+            st.write(result["itinerary"])
