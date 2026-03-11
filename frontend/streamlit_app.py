@@ -9,6 +9,7 @@ st.set_page_config(
     layout="wide"
 )
 
+
 # --------------------------------------------------
 # HEADER
 # --------------------------------------------------
@@ -24,9 +25,10 @@ st.divider()
 
 tab1, tab2 = st.tabs(["Trip Planner", "AI Travel Chat"])
 
-# --------------------------------------------------
+
+# ==================================================
 # TRIP PLANNER TAB
-# --------------------------------------------------
+# ==================================================
 
 with tab1:
 
@@ -43,32 +45,27 @@ with tab1:
 
     with d1:
         st.image("https://images.pexels.com/photos/338515/pexels-photo-338515.jpeg", use_container_width=True)
-        st.markdown("**Paris**")
-        if st.button("Select Paris"):
+        if st.button("Paris"):
             st.session_state.destination = "Paris"
 
     with d2:
         st.image("https://images.pexels.com/photos/2506923/pexels-photo-2506923.jpeg", use_container_width=True)
-        st.markdown("**Tokyo**")
-        if st.button("Select Tokyo"):
+        if st.button("Tokyo"):
             st.session_state.destination = "Tokyo"
 
     with d3:
         st.image("https://images.pexels.com/photos/466685/pexels-photo-466685.jpeg", use_container_width=True)
-        st.markdown("**New York**")
-        if st.button("Select New York"):
+        if st.button("New York"):
             st.session_state.destination = "New York"
 
     with d4:
         st.image("https://images.pexels.com/photos/823696/pexels-photo-823696.jpeg", use_container_width=True)
-        st.markdown("**Dubai**")
-        if st.button("Select Dubai"):
+        if st.button("Dubai"):
             st.session_state.destination = "Dubai"
 
     with d5:
         st.image("https://images.pexels.com/photos/1797161/pexels-photo-1797161.jpeg", use_container_width=True)
-        st.markdown("**Rome**")
-        if st.button("Select Rome"):
+        if st.button("Rome"):
             st.session_state.destination = "Rome"
 
     st.divider()
@@ -98,6 +95,10 @@ with tab1:
 
     st.write("")
 
+    # --------------------------------------------------
+    # GENERATE TRIP
+    # --------------------------------------------------
+
     if st.button("Generate Trip Plan"):
 
         payload = {
@@ -107,29 +108,27 @@ with tab1:
             "days": days
         }
 
-        with st.spinner("AI is planning your trip..."):
-            st.write("🔎 Searching flights...")
-            st.write("🏨 Finding hotels...")
-            st.write("💰 Calculating trip budget...")
-            st.write("🧠 Generating itinerary...")
+        try:
 
-            response = requests.post(API_URL, json=payload)
-            result = response.json()
+            with st.spinner("AI is planning your trip..."):
 
-        st.success("Trip generated successfully!")
+                st.write("🔎 Searching flights...")
+                st.write("🏨 Finding hotels...")
+                st.write("💰 Calculating trip budget...")
+                st.write("🧠 Generating itinerary...")
 
-        st.divider()
+                response = requests.post(API_URL, json=payload, timeout=120)
 
-        # --------------------------------------------------
-        # DESTINATION PREVIEW
-        # --------------------------------------------------
+                if response.status_code != 200:
+                    raise Exception("Backend error")
 
-        st.subheader(f"Destination Preview: {destination}")
+                result = response.json()
 
-        st.image(
-            "https://images.pexels.com/photos/417074/pexels-photo-417074.jpeg",
-            use_container_width=True
-        )
+            st.success("Trip generated successfully!")
+
+        except Exception:
+            st.error("⚠️ Could not generate trip. Please try again.")
+            st.stop()
 
         st.divider()
 
@@ -137,14 +136,16 @@ with tab1:
         # SUMMARY
         # --------------------------------------------------
 
+        budget = result.get("budget", {})
+
         st.subheader("Trip Summary")
 
         m1, m2, m3, m4 = st.columns(4)
 
         m1.metric("Travelers", travelers)
         m2.metric("Days", days)
-        m3.metric("Flight Cost", result["budget"]["flight_total"])
-        m4.metric("Total Budget", result["budget"]["total_trip_cost"])
+        m3.metric("Flight Cost", f"${budget.get('flight_total','N/A')}")
+        m4.metric("Total Budget", f"${budget.get('total_trip_cost','N/A')}")
 
         st.divider()
 
@@ -153,7 +154,7 @@ with tab1:
         # --------------------------------------------------
 
         st.subheader("✈️ Flights")
-        st.markdown(result["flight_info"])
+        st.markdown(result.get("flight_info", "No flight data available."))
 
         st.divider()
 
@@ -162,7 +163,7 @@ with tab1:
         # --------------------------------------------------
 
         st.subheader("🏨 Hotels")
-        st.markdown(result["hotel_info"])
+        st.markdown(result.get("hotel_info", "No hotel data available."))
 
         st.divider()
 
@@ -171,7 +172,15 @@ with tab1:
         # --------------------------------------------------
 
         st.subheader("💰 Budget Breakdown")
-        st.json(result["budget"])
+
+        st.markdown(f"""
+• ✈️ Flight Cost: **${budget.get("flight_total", "N/A")}**  
+• 🏨 Hotel Cost: **${budget.get("hotel_total", "N/A")}**  
+• 🚕 Transport: **${budget.get("transport_estimate", "N/A")}**  
+• 🎟 Activities: **${budget.get("activities_estimate", "N/A")}**
+
+### 💵 Total Trip Cost: **${budget.get("total_trip_cost", "N/A")}**
+""")
 
         st.divider()
 
@@ -180,73 +189,96 @@ with tab1:
         # --------------------------------------------------
 
         st.subheader("🗺️ Travel Itinerary")
-        st.markdown(result["itinerary"])
+        st.markdown(result.get("itinerary", "Itinerary could not be generated."))
 
 
-# --------------------------------------------------
-# --------------------------------------------------
+# ==================================================
 # CHAT TAB
-# --------------------------------------------------
+# ==================================================
 
 with tab2:
 
     st.subheader("💬 Travel Assistant")
 
-    user_input = st.text_input(
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    prompt = st.chat_input(
         "Ask something like: Plan a 5 day trip from Berlin to Rome for 2 people"
     )
 
-    if st.button("Ask Assistant"):
+    if prompt:
 
-        if not user_input.strip():
-            st.warning("Please enter a travel request.")
-        else:
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        st.session_state.messages.append({
+            "role": "user",
+            "content": prompt
+        })
+
+        assistant_reply = ""
+
+        with st.chat_message("assistant"):
 
             with st.spinner("🤖 AI is planning your trip..."):
 
-                payload = {"query": user_input}
+                try:
 
-                response = requests.post(
-                    "http://127.0.0.1:8000/chat-plan",
-                    json=payload
-                )
+                    payload = {"query": prompt}
 
-                result = response.json()
+                    response = requests.post(
+                        "http://127.0.0.1:8000/chat-plan",
+                        json=payload,
+                        timeout=120
+                    )
 
-            st.success("Trip generated successfully!")
+                    if response.status_code != 200:
+                        raise Exception("Backend error")
 
-            st.divider()
+                    result = response.json()
 
-            # ------------------------------
-            # FLIGHTS
-            # ------------------------------
+                    budget = result.get("budget", {})
 
-            st.subheader("✈️ Flights")
-            st.write(result["flight_info"])
+                    assistant_reply = f"""
+### ✈️ Flights
+{result.get("flight_info", "No flight data available.")}
 
-            st.divider()
+---
 
-            # ------------------------------
-            # HOTELS
-            # ------------------------------
+### 🏨 Hotels
+{result.get("hotel_info", "No hotel data available.")}
 
-            st.subheader("🏨 Hotels")
-            st.markdown(result["hotel_info"])
+---
 
-            st.divider()
+### 🗺️ Travel Itinerary
+{result.get("itinerary", "Itinerary could not be generated.")}
+"""
 
-            # ------------------------------
-            # BUDGET
-            # ------------------------------
+                    st.markdown(assistant_reply)
 
-            st.subheader("💰 Budget")
-            st.json(result["budget"])
+                    st.divider()
+                    st.markdown("### 💰 Budget Breakdown")
 
-            st.divider()
+                    col1, col2, col3, col4 = st.columns(4)
 
-            # ------------------------------
-            # ITINERARY
-            # ------------------------------
+                    col1.metric("✈️ Flights", f"${budget.get('flight_total','N/A')}")
+                    col2.metric("🏨 Hotels", f"${budget.get('hotel_total','N/A')}")
+                    col3.metric("🚕 Transport", f"${budget.get('transport_estimate','N/A')}")
+                    col4.metric("🎟 Activities", f"${budget.get('activities_estimate','N/A')}")
 
-            st.subheader("🗺️ Travel Itinerary")
-            st.write(result["itinerary"])
+                    st.metric("💵 Total Trip Cost", f"${budget.get('total_trip_cost','N/A')}")
+
+                except Exception:
+
+                    assistant_reply = "⚠️ Something went wrong while generating the trip. Please try again."
+                    st.error(assistant_reply)
+
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": assistant_reply
+        })

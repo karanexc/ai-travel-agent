@@ -5,7 +5,6 @@ from backend.extractors.flight_extractor import extract_flight_info
 from backend.extractors.hotel_extractor import extract_hotel_info
 
 from backend.services.budget_calculator import calculate_trip_budget
-
 from backend.agents.itinerary_generator import generate_itinerary
 
 
@@ -18,6 +17,17 @@ def collect_web_data(query):
     for r in results[:3]:
 
         url = r["link"]
+
+        # Skip bad scraping targets
+        bad_sites = [
+            "reddit.com",
+            "airindia",
+            "delta",
+            "britishairways"
+        ]
+
+        if any(site in url for site in bad_sites):
+            continue
 
         print("Scraping:", url)
 
@@ -33,7 +43,9 @@ def generate_trip(origin, destination, travelers, days):
 
     print("\nSearching flight information...\n")
 
-    flight_query = f"flights from {origin} to {destination} price duration airlines travel time"
+    flight_query = (
+        f"flights from {origin} to {destination} price duration airlines travel time"
+    )
 
     flight_text = collect_web_data(flight_query)
 
