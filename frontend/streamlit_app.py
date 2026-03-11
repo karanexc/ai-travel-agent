@@ -1,5 +1,7 @@
 import streamlit as st
 import requests
+import urllib.parse
+import json
 
 API_URL = "http://127.0.0.1:8000/plan-trip"
 
@@ -8,7 +10,6 @@ st.set_page_config(
     page_icon="✈️",
     layout="wide"
 )
-
 
 # --------------------------------------------------
 # HEADER
@@ -112,11 +113,6 @@ with tab1:
 
             with st.spinner("AI is planning your trip..."):
 
-                st.write("🔎 Searching flights...")
-                st.write("🏨 Finding hotels...")
-                st.write("💰 Calculating trip budget...")
-                st.write("🧠 Generating itinerary...")
-
                 response = requests.post(API_URL, json=payload, timeout=120)
 
                 if response.status_code != 200:
@@ -154,7 +150,7 @@ with tab1:
         # --------------------------------------------------
 
         st.subheader("✈️ Flights")
-        st.markdown(result.get("flight_info", "No flight data available."))
+        st.write(result.get("flight_info", "No flight data available."))
 
         st.divider()
 
@@ -163,7 +159,71 @@ with tab1:
         # --------------------------------------------------
 
         st.subheader("🏨 Hotels")
-        st.markdown(result.get("hotel_info", "No hotel data available."))
+
+        hotel_data = result.get("hotel_info", {})
+
+        # convert JSON string to dictionary
+        if isinstance(hotel_data, str):
+            try:
+                hotel_data = json.loads(hotel_data)
+            except:
+                hotel_data = {}
+
+        budget_hotels = hotel_data.get("budget_hotels", [])
+        mid_hotels = (
+            hotel_data.get("midrange_hotels", [])
+            or hotel_data.get("mid_hotels", [])
+            or hotel_data.get("midrange", [])
+        )
+        luxury_hotels = hotel_data.get("luxury_hotels", [])
+
+        def booking_link(hotel):
+            query = urllib.parse.quote(f"{hotel} {destination}")
+            return f"https://www.booking.com/searchresults.html?ss={query}"
+
+        # Budget hotels
+        if budget_hotels:
+            st.markdown("### 💰 Budget Hotels")
+            for hotel in budget_hotels:
+                col1, col2 = st.columns([4,1])
+                col1.write(hotel)
+                col2.link_button("Book", booking_link(hotel))
+
+        # Mid-range hotels
+        if mid_hotels:
+            st.markdown("### 🏨 Mid-range Hotels")
+            for hotel in mid_hotels:
+                col1, col2 = st.columns([4,1])
+                col1.write(hotel)
+                col2.link_button("Book", booking_link(hotel))
+
+        # Luxury hotels
+        if luxury_hotels:
+            st.markdown("### ✨ Luxury Hotels")
+            for hotel in luxury_hotels:
+                col1, col2 = st.columns([4,1])
+                col1.write(hotel)
+                col2.link_button("Book", booking_link(hotel))
+
+        # --------------------------------------------------
+        # MORE BOOKING OPTIONS
+        # --------------------------------------------------
+
+        st.markdown("### 🔗 More Booking Options")
+
+        destination_encoded = urllib.parse.quote(destination)
+
+        col1, col2 = st.columns(2)
+
+        col1.link_button(
+            "Search Hotels on Expedia",
+            f"https://www.expedia.com/Hotel-Search?destination={destination_encoded}"
+        )
+
+        col2.link_button(
+            "Find Hotels on KAYAK",
+            f"https://www.kayak.com/hotels/{destination_encoded}"
+        )
 
         st.divider()
 
@@ -173,14 +233,12 @@ with tab1:
 
         st.subheader("💰 Budget Breakdown")
 
-        st.markdown(f"""
-• ✈️ Flight Cost: **${budget.get("flight_total", "N/A")}**  
-• 🏨 Hotel Cost: **${budget.get("hotel_total", "N/A")}**  
-• 🚕 Transport: **${budget.get("transport_estimate", "N/A")}**  
-• 🎟 Activities: **${budget.get("activities_estimate", "N/A")}**
+        st.write(f"✈️ Flight Cost: ${budget.get('flight_total','N/A')}")
+        st.write(f"🏨 Hotel Cost: ${budget.get('hotel_total','N/A')}")
+        st.write(f"🚕 Transport: ${budget.get('transport_estimate','N/A')}")
+        st.write(f"🎟 Activities: ${budget.get('activities_estimate','N/A')}")
 
-### 💵 Total Trip Cost: **${budget.get("total_trip_cost", "N/A")}**
-""")
+        st.write(f"💵 Total Trip Cost: ${budget.get('total_trip_cost','N/A')}")
 
         st.divider()
 
@@ -189,7 +247,7 @@ with tab1:
         # --------------------------------------------------
 
         st.subheader("🗺️ Travel Itinerary")
-        st.markdown(result.get("itinerary", "Itinerary could not be generated."))
+        st.write(result.get("itinerary", "Itinerary could not be generated."))
 
 
 # ==================================================
@@ -205,7 +263,7 @@ with tab2:
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            st.write(message["content"])
 
     prompt = st.chat_input(
         "Ask something like: Plan a 5 day trip from Berlin to Rome for 2 people"
@@ -214,14 +272,12 @@ with tab2:
     if prompt:
 
         with st.chat_message("user"):
-            st.markdown(prompt)
+            st.write(prompt)
 
         st.session_state.messages.append({
             "role": "user",
             "content": prompt
         })
-
-        assistant_reply = ""
 
         with st.chat_message("assistant"):
 
@@ -237,48 +293,31 @@ with tab2:
                         timeout=120
                     )
 
-                    if response.status_code != 200:
-                        raise Exception("Backend error")
-
                     result = response.json()
 
                     budget = result.get("budget", {})
 
-                    assistant_reply = f"""
-### ✈️ Flights
-{result.get("flight_info", "No flight data available.")}
+                    st.write("✈️ Flights")
+                    st.write(result.get("flight_info"))
 
----
+                    st.write("🏨 Hotels")
+                    st.write(result.get("hotel_info"))
 
-### 🏨 Hotels
-{result.get("hotel_info", "No hotel data available.")}
+                    st.write("🗺️ Travel Itinerary")
+                    st.write(result.get("itinerary"))
 
----
+                    st.write("💰 Budget")
 
-### 🗺️ Travel Itinerary
-{result.get("itinerary", "Itinerary could not be generated.")}
-"""
+                    st.write(f"Flights: ${budget.get('flight_total','N/A')}")
+                    st.write(f"Hotels: ${budget.get('hotel_total','N/A')}")
+                    st.write(f"Transport: ${budget.get('transport_estimate','N/A')}")
+                    st.write(f"Activities: ${budget.get('activities_estimate','N/A')}")
+                    st.write(f"Total: ${budget.get('total_trip_cost','N/A')}")
 
-                    st.markdown(assistant_reply)
-
-                    st.divider()
-                    st.markdown("### 💰 Budget Breakdown")
-
-                    col1, col2, col3, col4 = st.columns(4)
-
-                    col1.metric("✈️ Flights", f"${budget.get('flight_total','N/A')}")
-                    col2.metric("🏨 Hotels", f"${budget.get('hotel_total','N/A')}")
-                    col3.metric("🚕 Transport", f"${budget.get('transport_estimate','N/A')}")
-                    col4.metric("🎟 Activities", f"${budget.get('activities_estimate','N/A')}")
-
-                    st.metric("💵 Total Trip Cost", f"${budget.get('total_trip_cost','N/A')}")
-
-                except Exception:
-
-                    assistant_reply = "⚠️ Something went wrong while generating the trip. Please try again."
-                    st.error(assistant_reply)
+                except:
+                    st.error("⚠️ Something went wrong.")
 
         st.session_state.messages.append({
             "role": "assistant",
-            "content": assistant_reply
+            "content": "Trip generated."
         })
